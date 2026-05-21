@@ -43,6 +43,10 @@ public class AccountEntity {
     @JoinColumn(name = "user_id")
     private UserEntity user;
 
+    @OneToOne(mappedBy = "accountEntity")
+    private CreditCardEntity creditCardEntity;
+
+
 
 
 }

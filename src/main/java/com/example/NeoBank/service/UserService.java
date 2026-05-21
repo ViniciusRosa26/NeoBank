@@ -3,14 +3,13 @@ package com.example.NeoBank.service;
 
 import com.example.NeoBank.dto.UserDto;
 import com.example.NeoBank.entity.AccountEntity;
+import com.example.NeoBank.entity.CreditCardEntity;
 import com.example.NeoBank.entity.UserEntity;
 import com.example.NeoBank.enums.Role;
 import com.example.NeoBank.exception.BadRequestException;
-import com.example.NeoBank.repository.AccountRepository;
 import com.example.NeoBank.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.time.LocalDateTime;
 
@@ -20,8 +19,8 @@ import java.time.LocalDateTime;
 public class UserService {
 
     private final UserRepository userRepository;
-private final AccountRepository accountRepository;
-private final AccountService accountService;
+    private final AccountService accountService;
+    private final CreditCardService creditCardService;
 
 
     public void createUser(UserDto userDto) throws BadRequestException {
@@ -48,6 +47,7 @@ private final AccountService accountService;
 
         userRepository.save(user);
         AccountEntity account = accountService.createDefaultAccount(user);
+        CreditCardEntity creditCardEntity = creditCardService.createDefaultCreditCard(user, account);
     }
 
     public UserEntity getUserbyID(Integer id) throws BadRequestException {
