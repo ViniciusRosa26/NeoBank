@@ -3,17 +3,12 @@ package com.example.NeoBank.service;
 import com.example.NeoBank.dto.TransactionDto;
 import com.example.NeoBank.entity.AccountEntity;
 import com.example.NeoBank.entity.TransactionEntity;
-import com.example.NeoBank.entity.UserEntity;
 import com.example.NeoBank.enums.EnumTypeTransaction;
 import com.example.NeoBank.exception.BadRequestException;
 import com.example.NeoBank.exception.NotFoundException;
 import com.example.NeoBank.repository.AccountRepository;
 import com.example.NeoBank.repository.TransactionRepositoty;
-import com.example.NeoBank.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,21 +20,21 @@ public class TransactionService {
 
     private final TransactionRepositoty transactionRepositoty;
     private final AccountRepository accountRepository;
-    private final UserRepository userRepository;
 
     @Transactional
-    public TransactionEntity createTransaction(TransactionDto transactionDto) {
+    public TransactionEntity createTransaction(Integer accountId, TransactionDto transactionDto) {
         validateTransactionDto(transactionDto);
+        validateAccountId(accountId);
 
         return switch (transactionDto.typeTransaction()) {
-            case DEPOSIT -> processDeposit(transactionDto);
-            case WITHDRAW -> processWithdraw(transactionDto);
-            case TRANSFER -> processTransfer(transactionDto);
+            case DEPOSIT -> processDeposit(accountId, transactionDto);
+            case WITHDRAW -> processWithdraw(accountId, transactionDto);
+            case TRANSFER -> processTransfer(accountId, transactionDto);
         };
     }
 
-    private TransactionEntity processDeposit(TransactionDto transactionDto) {
-        AccountEntity originAccount = getAuthenticatedAccount();
+    private TransactionEntity processDeposit(Integer accountId, TransactionDto transactionDto) {
+        AccountEntity originAccount = getAccountById(accountId);
         originAccount.setBalance(originAccount.getBalance() + transactionDto.amount());
         accountRepository.save(originAccount);
 
@@ -51,8 +46,8 @@ public class TransactionService {
         );
     }
 
-    private TransactionEntity processWithdraw(TransactionDto transactionDto) {
-        AccountEntity originAccount = getAuthenticatedAccount();
+    private TransactionEntity processWithdraw(Integer accountId, TransactionDto transactionDto) {
+        AccountEntity originAccount = getAccountById(accountId);
         validateSufficientBalance(originAccount, transactionDto.amount(), "Saldo insuficiente para saque");
 
         originAccount.setBalance(originAccount.getBalance() - transactionDto.amount());
@@ -66,8 +61,8 @@ public class TransactionService {
         );
     }
 
-    private TransactionEntity processTransfer(TransactionDto transactionDto) {
-        AccountEntity originAccount = getAuthenticatedAccount();
+    private TransactionEntity processTransfer(Integer accountId, TransactionDto transactionDto) {
+        AccountEntity originAccount = getAccountById(accountId);
         AccountEntity destinationAccount = getDestinationAccount(transactionDto.destinationAccountId());
 
         if (originAccount.getId().equals(destinationAccount.getId())) {
@@ -131,21 +126,9 @@ public class TransactionService {
         }
     }
 
-    private AccountEntity getAuthenticatedAccount() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication instanceof AnonymousAuthenticationToken) {
-            throw new NotFoundException("Usuario autenticado nao encontrado");
-        }
-
-        String email = authentication.getName();
-        UserEntity userEntity = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Usuario nao encontrado"));
-
-        return accountRepository.findByUserId(userEntity.getId())
-                .orElseThrow(() -> new NotFoundException("Conta nao encontrada para o usuario informado"));
+    private AccountEntity getAccountById(Integer accountId) {
+        return accountRepository.findById(accountId)
+                .orElseThrow(() -> new NotFoundException("Conta nao encontrada: " + accountId));
     }
 
     private AccountEntity getDestinationAccount(Integer destinationAccountId) {
@@ -156,6 +139,12 @@ public class TransactionService {
     private void validateSufficientBalance(AccountEntity accountEntity, Double amount, String message) {
         if (accountEntity.getBalance() < amount) {
             throw new BadRequestException(message);
+        }
+    }
+
+    private void validateAccountId(Integer accountId) {
+        if (accountId == null || accountId <= 0) {
+            throw new BadRequestException("O id da conta deve ser maior que zero");
         }
     }
 
