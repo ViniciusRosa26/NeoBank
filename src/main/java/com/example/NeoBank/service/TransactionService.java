@@ -1,0 +1,169 @@
+package com.example.NeoBank.service;
+
+import com.example.NeoBank.dto.TransactionDto;
+import com.example.NeoBank.entity.AccountEntity;
+import com.example.NeoBank.entity.TransactionEntity;
+import com.example.NeoBank.entity.UserEntity;
+import com.example.NeoBank.enums.EnumTypeTransaction;
+import com.example.NeoBank.exception.BadRequestException;
+import com.example.NeoBank.exception.NotFoundException;
+import com.example.NeoBank.repository.AccountRepository;
+import com.example.NeoBank.repository.TransactionRepositoty;
+import com.example.NeoBank.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+public class TransactionService {
+
+    private final TransactionRepositoty transactionRepositoty;
+    private final AccountRepository accountRepository;
+    private final UserRepository userRepository;
+
+    @Transactional
+    public TransactionEntity createTransaction(TransactionDto transactionDto) {
+        validateTransactionDto(transactionDto);
+
+        return switch (transactionDto.typeTransaction()) {
+            case DEPOSIT -> processDeposit(transactionDto);
+            case WITHDRAW -> processWithdraw(transactionDto);
+            case TRANSFER -> processTransfer(transactionDto);
+        };
+    }
+
+    private TransactionEntity processDeposit(TransactionDto transactionDto) {
+        AccountEntity originAccount = getAuthenticatedAccount();
+        originAccount.setBalance(originAccount.getBalance() + transactionDto.amount());
+        accountRepository.save(originAccount);
+
+        return saveTransaction(
+                transactionDto,
+                null,
+                originAccount.getId(),
+                buildDescription(transactionDto.description(), "sem origem")
+        );
+    }
+
+    private TransactionEntity processWithdraw(TransactionDto transactionDto) {
+        AccountEntity originAccount = getAuthenticatedAccount();
+        validateSufficientBalance(originAccount, transactionDto.amount(), "Saldo insuficiente para saque");
+
+        originAccount.setBalance(originAccount.getBalance() - transactionDto.amount());
+        accountRepository.save(originAccount);
+
+        return saveTransaction(
+                transactionDto,
+                originAccount.getId(),
+                null,
+                buildDescription(transactionDto.description(), "sem destino")
+        );
+    }
+
+    private TransactionEntity processTransfer(TransactionDto transactionDto) {
+        AccountEntity originAccount = getAuthenticatedAccount();
+        AccountEntity destinationAccount = getDestinationAccount(transactionDto.destinationAccountId());
+
+        if (originAccount.getId().equals(destinationAccount.getId())) {
+            throw new BadRequestException("A conta de destino deve ser diferente da conta de origem");
+        }
+
+        validateSufficientBalance(originAccount, transactionDto.amount(), "Saldo insuficiente para transferencia");
+
+        originAccount.setBalance(originAccount.getBalance() - transactionDto.amount());
+        destinationAccount.setBalance(destinationAccount.getBalance() + transactionDto.amount());
+
+        accountRepository.save(originAccount);
+        accountRepository.save(destinationAccount);
+
+        return saveTransaction(
+                transactionDto,
+                originAccount.getId(),
+                destinationAccount.getId(),
+                transactionDto.description()
+        );
+    }
+
+    private TransactionEntity saveTransaction(
+            TransactionDto transactionDto,
+            Integer originAccountId,
+            Integer destinationAccountId,
+            String description
+    ) {
+        TransactionEntity transactionEntity = TransactionEntity.builder()
+                .amount(transactionDto.amount())
+                .typeTransaction(transactionDto.typeTransaction())
+                .description(description)
+                .createdAt(LocalDateTime.now())
+                .originAccountId(originAccountId)
+                .destinationAccountId(destinationAccountId)
+                .build();
+
+        return transactionRepositoty.save(transactionEntity);
+    }
+
+    private void validateTransactionDto(TransactionDto transactionDto) {
+        if (transactionDto == null) {
+            throw new BadRequestException("Transacao invalida");
+        }
+
+        if (transactionDto.typeTransaction() == null) {
+            throw new BadRequestException("Tipo de transacao e obrigatorio");
+        }
+
+        if (transactionDto.amount() == null) {
+            throw new BadRequestException("O valor da transacao e obrigatorio");
+        }
+
+        if (transactionDto.amount() <= 0) {
+            throw new BadRequestException("O valor da transacao deve ser maior que zero");
+        }
+
+        if (transactionDto.typeTransaction() == EnumTypeTransaction.TRANSFER
+                && transactionDto.destinationAccountId() == null) {
+            throw new BadRequestException("O id da conta de destino e obrigatorio para transferencia");
+        }
+    }
+
+    private AccountEntity getAuthenticatedAccount() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            throw new NotFoundException("Usuario autenticado nao encontrado");
+        }
+
+        String email = authentication.getName();
+        UserEntity userEntity = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("Usuario nao encontrado"));
+
+        return accountRepository.findByUserId(userEntity.getId())
+                .orElseThrow(() -> new NotFoundException("Conta nao encontrada para o usuario informado"));
+    }
+
+    private AccountEntity getDestinationAccount(Integer destinationAccountId) {
+        return accountRepository.findById(destinationAccountId)
+                .orElseThrow(() -> new NotFoundException("Conta de destino nao encontrada: " + destinationAccountId));
+    }
+
+    private void validateSufficientBalance(AccountEntity accountEntity, Double amount, String message) {
+        if (accountEntity.getBalance() < amount) {
+            throw new BadRequestException(message);
+        }
+    }
+
+    private String buildDescription(String description, String fallback) {
+        if (description == null || description.isBlank()) {
+            return fallback;
+        }
+
+        return description + " - " + fallback;
+    }
+}
