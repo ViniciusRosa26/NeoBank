@@ -1,10 +1,9 @@
 package com.example.NeoBank.service;
 
+import com.example.NeoBank.dto.BalanceResponseDto;
 import com.example.NeoBank.entity.AccountEntity;
 import com.example.NeoBank.entity.UserEntity;
-import com.example.NeoBank.exception.BadRequestException;
 import com.example.NeoBank.repository.AccountRepository;
-import com.example.NeoBank.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,8 +14,8 @@ import java.math.BigDecimal;
 public class AccountService {
 
 
-    private final UserRepository userRepository;
     private final AccountRepository accountRepository;
+    private final AuthenticatedUserService authenticatedUserService;
 
     public AccountEntity createDefaultAccount(UserEntity user) {
         AccountEntity accountEntity = AccountEntity.builder()
@@ -32,5 +31,9 @@ public class AccountService {
         return accountRepository.save(accountEntity);
     }
 
+    public BalanceResponseDto getAuthenticatedBalance() {
+        AccountEntity accountEntity = authenticatedUserService.getAuthenticatedAccount();
+        return new BalanceResponseDto(accountEntity.getBalance());
+    }
 
 }

@@ -9,6 +9,7 @@ import com.example.NeoBank.enums.Role;
 import com.example.NeoBank.exception.BadRequestException;
 import com.example.NeoBank.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,6 +22,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final AccountService accountService;
     private final CreditCardService creditCardService;
+    private final PasswordEncoder passwordEncoder;
 
 
     public void createUser(UserDto userDto) throws BadRequestException {
@@ -34,7 +36,7 @@ public class UserService {
         UserEntity user = UserEntity.builder()
                 .name(userDto.name())
                 .email(userDto.email())
-                .password(userDto.password())
+                .password(passwordEncoder.encode(userDto.password()))
                 .phone(userDto.phone())
                 .cpf(userDto.cpf())
                 .occupationEnum(userDto.occupationEnum())
@@ -42,7 +44,7 @@ public class UserService {
                 .typeAccountEnum(userDto.typeAccountEnum())
                 .dateNasciment(userDto.dateNasciment())
                 .createdAt(LocalDateTime.now())
-                .role(Role.valueOf("USER"))
+                .role(Role.USER)
                 .build();
 
         userRepository.save(user);
@@ -62,7 +64,7 @@ public class UserService {
 
         userEntity.setName(userDto.name());
         userEntity.setEmail(userDto.email());
-        userEntity.setPassword(userDto.password());
+        userEntity.setPassword(passwordEncoder.encode(userDto.password()));
         userEntity.setPhone(userDto.phone());
         userEntity.setCpf(userDto.cpf());
         userEntity.setOccupationEnum(userDto.occupationEnum());

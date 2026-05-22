@@ -4,6 +4,7 @@ public enum EnumTypeTransaction {
 
     DEPOSIT,
     WITHDRAW,
-    TRANSFER;
+    TRANSFER,
+    PIX;
 
 }

@@ -2,11 +2,13 @@ package com.example.NeoBank.service;
 
 import com.example.NeoBank.dto.TransactionDto;
 import com.example.NeoBank.entity.AccountEntity;
+import com.example.NeoBank.entity.PixKeyEntity;
 import com.example.NeoBank.entity.TransactionEntity;
 import com.example.NeoBank.enums.EnumTypeTransaction;
 import com.example.NeoBank.exception.BadRequestException;
 import com.example.NeoBank.exception.NotFoundException;
 import com.example.NeoBank.repository.AccountRepository;
+import com.example.NeoBank.repository.PixKeyRepository;
 import com.example.NeoBank.repository.TransactionRepositoty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,21 +22,23 @@ public class TransactionService {
 
     private final TransactionRepositoty transactionRepositoty;
     private final AccountRepository accountRepository;
+    private final PixKeyRepository pixKeyRepository;
+    private final AuthenticatedUserService authenticatedUserService;
 
     @Transactional
-    public TransactionEntity createTransaction(Integer accountId, TransactionDto transactionDto) {
+    public TransactionEntity createTransaction(TransactionDto transactionDto) {
         validateTransactionDto(transactionDto);
-        validateAccountId(accountId);
 
-        return switch (transactionDto.typeTransaction()) {
-            case DEPOSIT -> processDeposit(accountId, transactionDto);
-            case WITHDRAW -> processWithdraw(accountId, transactionDto);
-            case TRANSFER -> processTransfer(accountId, transactionDto);
+        return switch (transactionDto.type()) {
+            case DEPOSIT -> processDeposit(transactionDto);
+            case WITHDRAW -> processWithdraw(transactionDto);
+            case TRANSFER -> processTransfer(transactionDto);
+            case PIX -> processPix(transactionDto);
         };
     }
 
-    private TransactionEntity processDeposit(Integer accountId, TransactionDto transactionDto) {
-        AccountEntity originAccount = getAccountById(accountId);
+    private TransactionEntity processDeposit(TransactionDto transactionDto) {
+        AccountEntity originAccount = getAuthenticatedAccount();
         originAccount.setBalance(originAccount.getBalance() + transactionDto.amount());
         accountRepository.save(originAccount);
 
@@ -46,8 +50,8 @@ public class TransactionService {
         );
     }
 
-    private TransactionEntity processWithdraw(Integer accountId, TransactionDto transactionDto) {
-        AccountEntity originAccount = getAccountById(accountId);
+    private TransactionEntity processWithdraw(TransactionDto transactionDto) {
+        AccountEntity originAccount = getAuthenticatedAccount();
         validateSufficientBalance(originAccount, transactionDto.amount(), "Saldo insuficiente para saque");
 
         originAccount.setBalance(originAccount.getBalance() - transactionDto.amount());
@@ -61,8 +65,8 @@ public class TransactionService {
         );
     }
 
-    private TransactionEntity processTransfer(Integer accountId, TransactionDto transactionDto) {
-        AccountEntity originAccount = getAccountById(accountId);
+    private TransactionEntity processTransfer(TransactionDto transactionDto) {
+        AccountEntity originAccount = getAuthenticatedAccount();
         AccountEntity destinationAccount = getDestinationAccount(transactionDto.destinationAccountId());
 
         if (originAccount.getId().equals(destinationAccount.getId())) {
@@ -81,7 +85,42 @@ public class TransactionService {
                 transactionDto,
                 originAccount.getId(),
                 destinationAccount.getId(),
-                transactionDto.description()
+                resolveDescription(transactionDto.description(), "transferencia")
+        );
+    }
+
+    private TransactionEntity processPix(TransactionDto transactionDto) {
+        AccountEntity originAccount = getAuthenticatedAccount();
+        PixKeyEntity destinationPixKey = pixKeyRepository.findByKeyValue(transactionDto.destinationPixKey())
+                .orElseThrow(() -> new NotFoundException("Chave Pix nao encontrada: " + transactionDto.destinationPixKey()));
+
+        if (transactionDto.pixKeyType() != destinationPixKey.getKeyType()) {
+            throw new BadRequestException("Tipo de chave Pix incorreto");
+        }
+
+        AccountEntity destinationAccount = destinationPixKey.getAccount();
+
+        if (destinationAccount == null) {
+            throw new NotFoundException("Conta vinculada a chave Pix nao encontrada");
+        }
+
+        if (originAccount.getId().equals(destinationAccount.getId())) {
+            throw new BadRequestException("Nao e permitido fazer Pix para a propria conta");
+        }
+
+        validateSufficientBalance(originAccount, transactionDto.amount(), "Saldo insuficiente para pix");
+
+        originAccount.setBalance(originAccount.getBalance() - transactionDto.amount());
+        destinationAccount.setBalance(destinationAccount.getBalance() + transactionDto.amount());
+
+        accountRepository.save(originAccount);
+        accountRepository.save(destinationAccount);
+
+        return saveTransaction(
+                transactionDto,
+                originAccount.getId(),
+                destinationAccount.getId(),
+                resolveDescription(transactionDto.description(), "pix")
         );
     }
 
@@ -93,7 +132,7 @@ public class TransactionService {
     ) {
         TransactionEntity transactionEntity = TransactionEntity.builder()
                 .amount(transactionDto.amount())
-                .typeTransaction(transactionDto.typeTransaction())
+                .typeTransaction(transactionDto.type())
                 .description(description)
                 .createdAt(LocalDateTime.now())
                 .originAccountId(originAccountId)
@@ -108,7 +147,7 @@ public class TransactionService {
             throw new BadRequestException("Transacao invalida");
         }
 
-        if (transactionDto.typeTransaction() == null) {
+        if (transactionDto.type() == null) {
             throw new BadRequestException("Tipo de transacao e obrigatorio");
         }
 
@@ -120,9 +159,19 @@ public class TransactionService {
             throw new BadRequestException("O valor da transacao deve ser maior que zero");
         }
 
-        if (transactionDto.typeTransaction() == EnumTypeTransaction.TRANSFER
+        if (transactionDto.type() == EnumTypeTransaction.TRANSFER
                 && transactionDto.destinationAccountId() == null) {
             throw new BadRequestException("O id da conta de destino e obrigatorio para transferencia");
+        }
+
+        if (transactionDto.type() == EnumTypeTransaction.PIX) {
+            if (transactionDto.destinationPixKey() == null || transactionDto.destinationPixKey().isBlank()) {
+                throw new BadRequestException("A chave Pix de destino e obrigatoria");
+            }
+
+            if (transactionDto.pixKeyType() == null) {
+                throw new BadRequestException("O tipo da chave Pix e obrigatorio");
+            }
         }
     }
 
@@ -142,17 +191,23 @@ public class TransactionService {
         }
     }
 
-    private void validateAccountId(Integer accountId) {
-        if (accountId == null || accountId <= 0) {
-            throw new BadRequestException("O id da conta deve ser maior que zero");
-        }
-    }
-
     private String buildDescription(String description, String fallback) {
         if (description == null || description.isBlank()) {
             return fallback;
         }
 
         return description + " - " + fallback;
+    }
+
+    private String resolveDescription(String description, String fallback) {
+        if (description == null || description.isBlank()) {
+            return fallback;
+        }
+
+        return description;
+    }
+
+    private AccountEntity getAuthenticatedAccount() {
+        return authenticatedUserService.getAuthenticatedAccount();
     }
 }

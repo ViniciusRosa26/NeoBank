@@ -3,6 +3,7 @@ package com.example.NeoBank.entity;
 import com.example.NeoBank.enums.OccupationEnum;
 import com.example.NeoBank.enums.Role;
 import com.example.NeoBank.enums.TypeAccountEnum;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -36,6 +37,7 @@ public class UserEntity implements UserDetails {
     private String email;
 
     @Column(nullable = false)
+    @JsonIgnore
     private String password;
 
     @Column(nullable = false, unique = true)
