@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function Login({ onLogin, onForgotPassword }) {
+export default function Login({ onLogin, onForgotPassword, onRegister }) {
   const [form, setForm] = useState({
     email: "",
     password: ""
@@ -29,8 +29,13 @@ export default function Login({ onLogin, onForgotPassword }) {
   }
 
   return (
-    <section className="card">
-      <h2>Login</h2>
+    <section className="auth-card">
+      <div className="section-heading">
+        <p className="eyebrow">Acesse sua conta</p>
+        <h1>Entrar no NeoBank</h1>
+        <p className="muted">Consulte saldo, movimente a conta e atualize seus dados em um unico painel.</p>
+      </div>
+
       <form onSubmit={handleSubmit} className="form">
         <label>
           Email
@@ -61,9 +66,14 @@ export default function Login({ onLogin, onForgotPassword }) {
         </button>
       </form>
 
-      <button type="button" className="secondary" onClick={onForgotPassword}>
-        Esqueci minha senha
-      </button>
+      <div className="stack-actions">
+        <button type="button" className="ghost-button" onClick={onForgotPassword}>
+          Esqueci minha senha
+        </button>
+        <button type="button" className="ghost-button" onClick={onRegister}>
+          Criar conta
+        </button>
+      </div>
     </section>
   );
 }

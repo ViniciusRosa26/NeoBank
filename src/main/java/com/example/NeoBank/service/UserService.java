@@ -1,7 +1,9 @@
 package com.example.NeoBank.service;
 
 
+import com.example.NeoBank.dto.UpdateEmailDto;
 import com.example.NeoBank.dto.UserDto;
+import com.example.NeoBank.dto.UserSummaryDto;
 import com.example.NeoBank.entity.AccountEntity;
 import com.example.NeoBank.entity.CreditCardEntity;
 import com.example.NeoBank.entity.UserEntity;
@@ -23,6 +25,7 @@ public class UserService {
     private final AccountService accountService;
     private final CreditCardService creditCardService;
     private final PasswordEncoder passwordEncoder;
+    private final AuthenticatedUserService authenticatedUserService;
 
 
     public void createUser(UserDto userDto) throws BadRequestException {
@@ -58,6 +61,14 @@ public class UserService {
         return userEntity;
     }
 
+    public UserSummaryDto getAuthenticatedUserSummary() {
+        UserEntity userEntity = authenticatedUserService.getAuthenticatedUser();
+        AccountEntity accountEntity = authenticatedUserService.getAuthenticatedAccount();
+        CreditCardEntity creditCardEntity = accountEntity.getCreditCardEntity();
+
+        return toUserSummary(userEntity, accountEntity, creditCardEntity);
+    }
+
     public UserEntity setUserbyID(Integer id, UserDto userDto) throws BadRequestException {
         UserEntity userEntity = userRepository.findById(id)
                 .orElseThrow(() -> new BadRequestException("Usuário não encontrado: " + id));
@@ -76,6 +87,25 @@ public class UserService {
         return userRepository.save(userEntity);
     }
 
+    public UserSummaryDto updateAuthenticatedUserEmail(UpdateEmailDto updateEmailDto) {
+        if (updateEmailDto == null || updateEmailDto.email() == null || updateEmailDto.email().isBlank()) {
+            throw new BadRequestException("Email e obrigatorio");
+        }
+
+        UserEntity authenticatedUser = authenticatedUserService.getAuthenticatedUser();
+        UserEntity existingUser = userRepository.findByEmail(updateEmailDto.email()).orElse(null);
+
+        if (existingUser != null && !existingUser.getId().equals(authenticatedUser.getId())) {
+            throw new BadRequestException("Email ja cadastrado");
+        }
+
+        authenticatedUser.setEmail(updateEmailDto.email().trim());
+        UserEntity savedUser = userRepository.save(authenticatedUser);
+        AccountEntity accountEntity = authenticatedUserService.getAuthenticatedAccount();
+
+        return toUserSummary(savedUser, accountEntity, accountEntity.getCreditCardEntity());
+    }
+
     public void deleteUserbyID(Integer id) throws BadRequestException {
 
         UserEntity userEntity = userRepository.findById(id)
@@ -84,5 +114,39 @@ public class UserService {
 
         //voltar aqui e implementar transactional
         userRepository.delete(userEntity);
+    }
+
+    private UserSummaryDto toUserSummary(
+            UserEntity userEntity,
+            AccountEntity accountEntity,
+            CreditCardEntity creditCardEntity
+    ) {
+        return new UserSummaryDto(
+                userEntity.getId(),
+                userEntity.getName(),
+                userEntity.getEmail(),
+                userEntity.getCpf(),
+                userEntity.getPhone(),
+                userEntity.getOccupationEnum(),
+                userEntity.getSalary(),
+                userEntity.getTypeAccountEnum(),
+                userEntity.getDateNasciment(),
+                accountEntity.getId(),
+                accountEntity.getBalance(),
+                accountEntity.getDiaryLimitPix(),
+                accountEntity.getNightLimitPix(),
+                creditCardEntity != null ? creditCardEntity.getLimitCredit() : null,
+                creditCardEntity != null ? creditCardEntity.getHolderName() : null,
+                creditCardEntity != null ? maskCardNumber(creditCardEntity.getNumber()) : null,
+                creditCardEntity != null ? creditCardEntity.getExpirationDate() : null
+        );
+    }
+
+    private String maskCardNumber(String number) {
+        if (number == null || number.length() < 4) {
+            return "Cartao indisponivel";
+        }
+
+        return "**** **** **** " + number.substring(number.length() - 4);
     }
 }

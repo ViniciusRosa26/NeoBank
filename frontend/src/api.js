@@ -30,6 +30,58 @@ export async function getBalance(token) {
   });
 }
 
+export async function createUser(payload) {
+  return request("/v1/users", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getUserSummary(token) {
+  return request("/v1/users/me", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function updateEmail(token, payload) {
+  return request("/v1/users/me/email", {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function createTransaction(token, payload) {
+  return request("/v1/transactions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function createPixKey(token, payload) {
+  return request("/v1/pix-keys", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
 export function saveAuth(authData) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
 }
@@ -90,7 +142,7 @@ function getErrorMessage(response, data, text) {
   }
 
   if (response.status === 401) {
-    return "Nao autorizado. Verifique suas credenciais.";
+    return "Nao autorizado (401). O token pode estar invalido, expirado ou nao estar chegando corretamente ao backend.";
   }
 
   if (response.status === 403) {
@@ -105,5 +157,5 @@ function getErrorMessage(response, data, text) {
     return text.trim();
   }
 
-  return "Erro na requisicao";
+  return `Erro na requisicao (${response.status})`;
 }

@@ -33,8 +33,13 @@ export default function ForgotPassword({ onSubmit, onBack }) {
   }
 
   return (
-    <section className="card">
-      <h2>Recuperar Senha</h2>
+    <section className="auth-card">
+      <div className="section-heading">
+        <p className="eyebrow">Recuperacao</p>
+        <h1>Atualize sua senha</h1>
+        <p className="muted">Validacao por email, CPF e telefone, seguindo o fluxo aceito pelo backend.</p>
+      </div>
+
       <form onSubmit={handleSubmit} className="form">
         <label>
           Email
@@ -70,7 +75,7 @@ export default function ForgotPassword({ onSubmit, onBack }) {
         </button>
       </form>
 
-      <button type="button" className="secondary" onClick={onBack}>
+      <button type="button" className="ghost-button" onClick={onBack}>
         Voltar para login
       </button>
     </section>
