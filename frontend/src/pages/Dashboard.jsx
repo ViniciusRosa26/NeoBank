@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   clearAuth,
+  createBalanceSocket,
   createPixKey,
   createTransaction,
   getUserSummary,
@@ -73,6 +74,45 @@ export default function Dashboard({ auth, onLogout, onForgotPassword }) {
   useEffect(() => {
     loadSummary();
   }, []);
+
+  useEffect(() => {
+    if (!auth.token) {
+      return undefined;
+    }
+
+    const socket = createBalanceSocket(auth.token);
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (typeof data.balance !== "number") {
+          return;
+        }
+
+        setSummary((current) => {
+          if (!current) {
+            return current;
+          }
+
+          if (data.accountId && current.accountId !== data.accountId) {
+            return current;
+          }
+
+          return {
+            ...current,
+            balance: data.balance
+          };
+        });
+      } catch {
+        // ignora mensagens invalidas para nao quebrar a tela
+      }
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, [auth.token]);
 
   async function loadSummary() {
     setLoadingSummary(true);

@@ -82,6 +82,10 @@ export async function createPixKey(token, payload) {
   });
 }
 
+export function createBalanceSocket(token) {
+  return new WebSocket(buildWebSocketUrl("/ws/balance", token));
+}
+
 export function saveAuth(authData) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
 }
@@ -122,6 +126,13 @@ async function request(path, options) {
 
 function buildUrl(path) {
   return `${API_URL}${path}`;
+}
+
+function buildWebSocketUrl(path, token) {
+  const resolvedUrl = new URL(buildUrl(path), window.location.origin);
+  resolvedUrl.protocol = resolvedUrl.protocol === "https:" ? "wss:" : "ws:";
+  resolvedUrl.searchParams.set("token", token);
+  return resolvedUrl.toString();
 }
 
 function parseJsonSafely(text) {
