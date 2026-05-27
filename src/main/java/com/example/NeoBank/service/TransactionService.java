@@ -1,6 +1,7 @@
 package com.example.NeoBank.service;
 
 import com.example.NeoBank.dto.TransactionDto;
+import com.example.NeoBank.dto.BalanceUpdateDto;
 import com.example.NeoBank.entity.AccountEntity;
 import com.example.NeoBank.entity.PixKeyEntity;
 import com.example.NeoBank.entity.TransactionEntity;
@@ -13,6 +14,8 @@ import com.example.NeoBank.repository.TransactionRepositoty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 
@@ -24,10 +27,14 @@ public class TransactionService {
     private final AccountRepository accountRepository;
     private final PixKeyRepository pixKeyRepository;
     private final AuthenticatedUserService authenticatedUserService;
+    private final TransactionRateLimitService transactionRateLimitService;
+    private final BalanceWebSocketService balanceWebSocketService;
 
     @Transactional
     public TransactionEntity createTransaction(TransactionDto transactionDto) {
         validateTransactionDto(transactionDto);
+        AccountEntity authenticatedAccount = getAuthenticatedAccount();
+        transactionRateLimitService.checkLimit(authenticatedAccount.getId());
 
         return switch (transactionDto.type()) {
             case DEPOSIT -> processDeposit(transactionDto);
@@ -41,6 +48,7 @@ public class TransactionService {
         AccountEntity originAccount = getAuthenticatedAccount();
         originAccount.setBalance(originAccount.getBalance() + transactionDto.amount());
         accountRepository.save(originAccount);
+        scheduleBalanceUpdate(originAccount);
 
         return saveTransaction(
                 transactionDto,
@@ -56,6 +64,7 @@ public class TransactionService {
 
         originAccount.setBalance(originAccount.getBalance() - transactionDto.amount());
         accountRepository.save(originAccount);
+        scheduleBalanceUpdate(originAccount);
 
         return saveTransaction(
                 transactionDto,
@@ -80,6 +89,8 @@ public class TransactionService {
 
         accountRepository.save(originAccount);
         accountRepository.save(destinationAccount);
+        scheduleBalanceUpdate(originAccount);
+        scheduleBalanceUpdate(destinationAccount);
 
         return saveTransaction(
                 transactionDto,
@@ -115,6 +126,8 @@ public class TransactionService {
 
         accountRepository.save(originAccount);
         accountRepository.save(destinationAccount);
+        scheduleBalanceUpdate(originAccount);
+        scheduleBalanceUpdate(destinationAccount);
 
         return saveTransaction(
                 transactionDto,
@@ -209,5 +222,21 @@ public class TransactionService {
 
     private AccountEntity getAuthenticatedAccount() {
         return authenticatedUserService.getAuthenticatedAccount();
+    }
+
+    private void scheduleBalanceUpdate(AccountEntity accountEntity) {
+        BalanceUpdateDto message = new BalanceUpdateDto(accountEntity.getId(), accountEntity.getBalance());
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            balanceWebSocketService.sendBalanceUpdate(accountEntity, message);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                balanceWebSocketService.sendBalanceUpdate(accountEntity, message);
+            }
+        });
     }
 }

@@ -53,6 +53,7 @@ private final JwtAuthenticationFilter jwtAuthenticationFilter;
                                 .requestMatchers(HttpMethod.POST, "/v1/users").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/v1/auth/login").permitAll()
                                 .requestMatchers(HttpMethod.PUT, "/v1/auth/forgot-password").permitAll()
+                                .requestMatchers("/ws/**").permitAll()
                                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                                 .anyRequest().authenticated()
                 )

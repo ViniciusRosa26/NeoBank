@@ -3,10 +3,15 @@ spring:
     name: NeoBank
 
   datasource:
-    url: jdbc:postgresql://localhost:5433/neobank
-    username: postgres
-    password: admin
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:neobank}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:admin}
     driver-class-name: org.postgresql.Driver
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
   jpa:
     hibernate:

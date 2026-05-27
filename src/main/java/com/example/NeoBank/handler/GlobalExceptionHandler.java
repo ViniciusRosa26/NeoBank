@@ -4,6 +4,7 @@ package com.example.NeoBank.handler;
 import com.example.NeoBank.exception.BadRequestException;
 import com.example.NeoBank.exception.ErrorResponse;
 import com.example.NeoBank.exception.NotFoundException;
+import com.example.NeoBank.exception.TooManyRequestsException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -35,6 +36,18 @@ public class GlobalExceptionHandler  {
         );
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(errorResponse);
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ErrorResponse> handleTooManyRequestsException(TooManyRequestsException e) {
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                e.getMessage(),
+                String.valueOf(HttpStatus.TOO_MANY_REQUESTS.value())
+        );
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .body(errorResponse);
     }
 
