@@ -1,5 +1,6 @@
 package com.example.NeoBank.entity;
 
+import com.example.NeoBank.dto.UserDto;
 import com.example.NeoBank.enums.OccupationEnum;
 import com.example.NeoBank.enums.Role;
 import com.example.NeoBank.enums.TypeAccountEnum;
@@ -68,6 +69,18 @@ public class UserEntity implements UserDetails {
 
     @OneToOne(mappedBy = "user")
     private AccountEntity account;
+
+    public UserEntity(UserDto userDto) {
+        this.name = userDto.name();
+        this.email = userDto.email();
+        this.password = userDto.password();
+        this.occupationEnum = userDto.occupationEnum();
+        this.cpf = userDto.cpf();
+        this.phone = userDto.phone();
+        this.salary = userDto.salary();
+        this.typeAccountEnum = userDto.typeAccountEnum();
+        this.dateNasciment = userDto.dateNasciment();
+    }
 
     @Override
     // Retorna as autoridades (roles/permissions) associadas ao usuário.
