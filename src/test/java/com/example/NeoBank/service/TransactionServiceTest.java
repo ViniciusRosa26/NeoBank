@@ -3,6 +3,7 @@ package com.example.NeoBank.service;
 import com.example.NeoBank.dto.TransactionDto;
 import com.example.NeoBank.entity.TransactionEntity;
 import com.example.NeoBank.entity.UserEntity;
+import com.example.NeoBank.enums.EnumTypeTransaction;
 import com.example.NeoBank.enums.PixKeyTypeEnum;
 import com.example.NeoBank.exception.BadRequestException;
 import com.example.NeoBank.repository.AccountRepository;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TransactionServiceTest {
+
 
     @Mock
     private TransactionRepositoty transactionRepositoty;
@@ -61,5 +63,45 @@ class TransactionServiceTest {
         assertThrows(BadRequestException.class, () -> transactionService.createTransaction(transaction));
 
     }
+
+    @Test
+    @DisplayName("quando amount for nulo")
+    void createTransacationcase3_nuulamount(){
+
+        TransactionDto transaction = new TransactionDto(null, TRANSFER, "Desc1", 3, "hdsfsd", PixKeyTypeEnum.RANDOM_KEY);
+        assertThrows(BadRequestException.class, () -> transactionService.createTransaction(transaction));
+    }
+
+    @Test
+    @DisplayName("quando amount for menor que zero")
+    void createTransactioncase4_amountlesszero(){
+        TransactionDto transaction = new TransactionDto(-2.0 , TRANSFER, "Desc1", 3, "hdsfsd", PixKeyTypeEnum.RANDOM_KEY);
+        assertThrows(BadRequestException.class, () -> transactionService.createTransaction(transaction));
+    }
+
+    @Test
+    @DisplayName("quando n ter id ")
+    void createTransactioncase4_semid() {
+        TransactionDto transaction = new TransactionDto(-2.0, TRANSFER, "Desc1", null, "hdsfsd", PixKeyTypeEnum.RANDOM_KEY);
+        assertThrows(BadRequestException.class, () -> transactionService.createTransaction(transaction));
+
+    }
+
+    @Test
+    @DisplayName("sem pixkey ")
+    void createTransactioncase4_sempixkey() {
+        TransactionDto transaction = new TransactionDto(-2.0, TRANSFER, "Desc1", 3, null, PixKeyTypeEnum.RANDOM_KEY);
+        assertThrows(BadRequestException.class, () -> transactionService.createTransaction(transaction));
+
+    }
+
+    @Test
+    @DisplayName("quando n ter tipo do pix  ")
+    void createTransactioncase4_withouttypepix() {
+        TransactionDto transaction = new TransactionDto(-2.0, TRANSFER, "Desc1", 4, "hdsfsd", null);
+        assertThrows(BadRequestException.class, () -> transactionService.createTransaction(transaction));
+
+    }
+
 }
 
