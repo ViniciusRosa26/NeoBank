@@ -1,9 +1,0 @@
-.git
-.gitignore
-.idea
-.mvn/wrapper/maven-wrapper.jar
-target
-frontend/node_modules
-frontend/dist
-node_modules
-*.log
